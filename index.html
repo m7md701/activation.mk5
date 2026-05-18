@@ -6,16 +6,15 @@
 <title>MK5 | صـفـحـة الـنـظـام الـرئـيـسـيـة</title>
 <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
 
 <div class="wrap">
 
-  <!-- ===== الهيدر ===== -->
   <div class="header">
-  <div id="homeNotice" class="notice bad" style="display:none; margin-top:14px;"></div>
 
     <div class="brand">
-      <img src="/img/logo.png" alt="logo">
+      <img src="https://i.ibb.co/zHnht2xm/final-4.gif" alt="logo">
       <div>
         <div class="title">𝐄𝐥𝐞𝐜𝐭𝐫𝐨𝐧𝐢𝐜 𝐀𝐜𝐭𝐢𝐯𝐚𝐭𝐢𝐨𝐧 𝐒𝐲𝐬𝐭𝐞𝐦 | 𝐌𝐊𝟓</div>
         <div class="sub">الـواجـهـة الـرئـيـسـيـة لـلـنـظـام</div>
@@ -24,43 +23,24 @@
 
     <div class="nav" id="navArea">
 
-      <!-- متجر المدينة -->
       <a href="https://mk5sa.rzq.sa/" target="_blank" class="btn">
         زر مـتـجـر الـمـديـنـة
       </a>
 
-      <!-- الانضمام للديسكورد -->
       <a href="https://discord.gg/mk5" target="_blank" class="btn">
         انـضـم إلـى الـديـسـكـورد
       </a>
 
-      <!-- زر ديناميكي (يتغير حسب تسجيل الدخول) -->
       <a id="authBtn" class="btn primary" href="/auth/login">
         تـسـجـيـل الـدخـول بـالـنـظـام
       </a>
-
-      <script>
-      (function(){
-      const p = new URLSearchParams(location.search);
-      const cooldown = p.get("cooldown");
-      const wait = p.get("wait") || "خـمـس دقـائـق";
-
-     if(cooldown){
-     const box = document.getElementById("homeNotice");
-     if(box){
-      box.style.display = "block";
-      box.textContent = `رسـبـت بـالاخـتـبـار يـرجـى الانـتـظـار  ${wait} قـبـل إعـادة الـمـحـاولـة`;
-     }
-     }
-     })();
-
-</script>
 
     </div>
 
   </div>
 
-  <!-- ===== المحتوى ===== -->
+  <div id="homeNotice" class="notice bad" style="display:none; margin-top:14px;"></div>
+
   <div class="card">
 
     <h1>نـظـام التـفـعـيـل الإلـكـتـرونـي الـحـديـث - MK5</h1>
@@ -79,7 +59,7 @@
 
     <ul style="line-height:2;">
       <li>تـسـجـيـل الـدخـول عـبـر حـسـاب ديـسـكـورد الـخـاص بـك</li>
-      <li> اجـتـيـاز اخـتـبـار الـتـفـعـيـل الـ 10 اسـألـة</li>
+      <li>اجـتـيـاز اخـتـبـار الـتـفـعـيـل الـ 10 اسـألـة</li>
       <li>اخـتـيـار الـقـطـاع الـعـسـكـري الـمـنـاسـب لـك</li>
       <li>إدخـال الاسـم الـثـنـائـي الـحـقـيـقـي</li>
       <li>اسـتـلام الـرول الـمـعـتـمـد داخـل الـسـيـرفـر</li>
@@ -101,31 +81,186 @@
 </div>
 
 <script>
+let guildTimer = null;
+let checkingGuild = false;
 
-// نتحقق هل المستخدم مسجل دخول
-async function checkLogin() {
+const DISCORD_INVITE_FALLBACK = "https://discord.gg/mk5";
 
-  try {
+async function api(path, opts = {}) {
+  const r = await fetch(path, {
+    credentials: "include",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-cache"
+    },
+    ...opts
+  });
 
-    const r = await fetch("/api/me");
+  const data = await r.json().catch(() => ({}));
 
-    if (!r.ok) return; // غير مسجل
-
-    const data = await r.json();
-
-    // إذا وصلنا هنا يعني مسجل دخول
-    const btn = document.getElementById("authBtn");
-
-    btn.textContent = "بـدء الـتـفـعـيـل الإلـكـتـرونـي";
-    btn.href = "/rules.html";
-
-  } catch(e) {
+  if (!r.ok) {
+    const err = new Error(data.error || "API_ERROR");
+    err.data = data;
+    throw err;
   }
 
+  return data;
 }
 
-checkLogin();
+async function loadMe() {
+  try {
+    return await api("/api/me?t=" + Date.now());
+  } catch {
+    return null;
+  }
+}
 
+function setLoginButton() {
+  const btn = document.getElementById("authBtn");
+  if (!btn) return;
+
+  btn.textContent = "تـسـجـيـل الـدخـول بـالـنـظـام";
+  btn.href = "/auth/login";
+  btn.onclick = null;
+}
+
+function setNeedDiscordButton(inviteUrl) {
+  const btn = document.getElementById("authBtn");
+  if (!btn) return;
+
+  const finalInvite = inviteUrl || DISCORD_INVITE_FALLBACK;
+
+  btn.textContent = "يـجـب دخـول الـديـسـكـورد أولاً";
+  btn.href = finalInvite;
+  btn.target = "_blank";
+  btn.rel = "noopener noreferrer";
+
+  btn.onclick = function() {
+    startGuildWatcher();
+  };
+}
+
+function setActivationButton() {
+  const btn = document.getElementById("authBtn");
+  if (!btn) return;
+
+  btn.textContent = "بـدء الـتـفـعـيـل الإلـكـتـرونـي";
+  btn.href = "/rules.html";
+  btn.target = "";
+  btn.rel = "";
+  btn.onclick = null;
+}
+
+function setActivatedButton() {
+  const btn = document.getElementById("authBtn");
+  if (!btn) return;
+
+  btn.textContent = "أنـت مـفـعـل مـسـبـقـاً";
+  btn.href = "/result.html";
+  btn.target = "";
+  btn.rel = "";
+  btn.onclick = null;
+}
+
+function showOkNotice(text) {
+  const box = document.getElementById("homeNotice");
+  if (!box) return;
+
+  box.style.display = "block";
+  box.className = "notice ok";
+  box.textContent = text;
+}
+
+function showBadNotice(text) {
+  const box = document.getElementById("homeNotice");
+  if (!box) return;
+
+  box.style.display = "block";
+  box.className = "notice bad";
+  box.textContent = text;
+}
+
+function stopGuildWatcher() {
+  if (guildTimer) {
+    clearInterval(guildTimer);
+    guildTimer = null;
+  }
+}
+
+async function refreshGuildStatus(showSuccess) {
+  if (checkingGuild) return;
+
+  checkingGuild = true;
+  const me = await loadMe();
+  checkingGuild = false;
+
+  if (!me) {
+    stopGuildWatcher();
+    setLoginButton();
+    return;
+  }
+
+  if (me.inGuild) {
+    stopGuildWatcher();
+
+    if (me.hasActivatedRole) {
+      setActivatedButton();
+      return;
+    }
+
+    setActivationButton();
+
+    if (showSuccess) {
+      showOkNotice("تـم الـتـعـرف عـلـى دخـولـك لـلـديـسـكـورد، يـمـكـنـك الآن بـدء الـتـفـعـيـل");
+    }
+
+    return;
+  }
+
+  setNeedDiscordButton(me.inviteUrl || DISCORD_INVITE_FALLBACK);
+  startGuildWatcher();
+}
+
+function startGuildWatcher() {
+  if (guildTimer) return;
+
+  guildTimer = setInterval(() => {
+    refreshGuildStatus(true);
+  }, 2000);
+}
+
+window.addEventListener("focus", () => {
+  refreshGuildStatus(true);
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    refreshGuildStatus(true);
+  }
+});
+
+(function() {
+  const p = new URLSearchParams(location.search);
+  const cooldown = p.get("cooldown");
+  const wait = p.get("wait") || "خـمـس دقـائـق";
+  const failed = p.get("failed");
+  const e = p.get("e");
+
+  if (cooldown) {
+    showBadNotice(`رسـبـت بـالاخـتـبـار يـرجـى الانـتـظـار ${wait} قـبـل إعـادة الـمـحـاولـة`);
+  }
+
+  if (failed) {
+    showBadNotice(`رسـبـت بـالاخـتـبـار يـرجـى الانـتـظـار ${wait} قـبـل إعـادة الـمـحـاولـة`);
+  }
+
+  if (e) {
+    showBadNotice("حـدث خـطـأ فـي تـسـجـيـل الـدخـول تـأكـد مـن إعـدادات Discord OAuth");
+  }
+})();
+
+refreshGuildStatus(false);
 </script>
 
 </body>
