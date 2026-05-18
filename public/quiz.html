@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MK5 | صـفـحـة اخـتـبـار الـتـفـعـيـل</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="header">
+    <div class="brand">
+      <img src="https://i.ibb.co/zHnht2xm/final-4.gif" alt="logo">
+      <div>
+        <div class="title">𝐄𝐥𝐞𝐜𝐭𝐫𝐨𝐧𝐢𝐜 𝐀𝐜𝐭𝐢𝐯𝐚𝐭𝐢𝐨𝐧 𝐒𝐲𝐬𝐭𝐞𝐦 | 𝐌𝐊𝟓</div>
+        <div class="sub">اخـتـبـار اسـألـة الـتـفـعـيـل</div>
+      </div>
+    </div>
+    <div class="nav">
+      <a class="btn" href="/">الـعـود لـلـصـفـحـة الـرئـيـسـيـة</a>
+      <button class="btn" id="logoutBtn">تـسـجـيـل خـروج والـعـود لـلـرئـيـسـيـة</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h1>هـنـا تـسـتـطـيـع بـدء اخـتـبـارك</h1>
+    <p class="muted">امـامـك عـشـر اسـالـة يـجـب حـل خـمـسـة أسـئـلـة عـلـى الاقـل كـي تـنـجـح</p>
+
+    <div class="sep"></div>
+
+    <div id="notice" class="notice" style="display:none;"></div>
+    <div id="quizArea"></div>
+
+    <div class="sep"></div>
+
+    <button class="btn primary" id="submitBtn">ارسـال واعـتـمـاد الأجـوبـة</button>
+  </div>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+let quiz = null;
+
+document.getElementById("logoutBtn").onclick = logout;
+
+async function loadQuiz(){
+  const me = await requireAuth();
+  if (!me) return;
+
+  try {
+    quiz = await api("/api/quiz");
+    renderQuiz();
+  } catch (e) {
+    if (e.data && e.data.redirect) {
+      location.href = e.data.redirect;
+      return;
+    }
+
+    showNotice("notice", "تـعـذر تـحـمـيـل الاخـتـبـار");
+  }
+}
+
+function renderQuiz(){
+  const box = document.getElementById("quizArea");
+  box.innerHTML = "";
+
+  quiz.questions.forEach((q, i) => {
+    const el = document.createElement("div");
+    el.className = "q";
+
+    el.innerHTML = `
+      <div class="qt">${i + 1}) ${q.q}</div>
+      <div class="opts">
+        ${q.options.map((op, idx) => `
+          <label class="opt">
+            <input type="radio" name="q${i}" value="${idx}">
+            <span>${op}</span>
+          </label>
+        `).join("")}
+      </div>
+    `;
+
+    box.appendChild(el);
+  });
+}
+
+function getAnswers(){
+  const answers = [];
+
+  for (let i = 0; i < quiz.total; i++) {
+    const pick = document.querySelector(`input[name="q${i}"]:checked`);
+    answers.push(pick ? Number(pick.value) : -1);
+  }
+
+  return answers;
+}
+
+document.getElementById("submitBtn").onclick = async () => {
+  hideNotice("notice");
+
+  const answers = getAnswers();
+
+  if (answers.includes(-1)) {
+    showNotice("notice", "يـجـب الإجـابـة عـلـى جـمـيـع الأسـئـلـة");
+    return;
+  }
+
+  const btn = document.getElementById("submitBtn");
+  btn.disabled = true;
+
+  try {
+    const res = await api("/api/quiz/submit", {
+      method: "POST",
+      body: JSON.stringify({ answers })
+    });
+
+    location.href = res.redirect || "/sector.html";
+  } catch (e) {
+    btn.disabled = false;
+
+    if (e.data && e.data.redirect) {
+      location.href = e.data.redirect;
+      return;
+    }
+
+    showNotice("notice", "حـدث خـطـأ اثـنـاء إرسـال الاخـتـبـار");
+  }
+};
+
+loadQuiz();
+</script>
+
+</body>
+</html>

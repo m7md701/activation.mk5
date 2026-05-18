@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MK5 | صـفـحـة ادخـال الاسـم</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="header">
+    <div class="brand">
+      <img src="https://i.ibb.co/zHnht2xm/final-4.gif" alt="logo">
+      <div>
+        <div class="title">𝐄𝐥𝐞𝐜𝐭𝐫𝐨𝐧𝐢𝐜 𝐀𝐜𝐭𝐢𝐯𝐚𝐭𝐢𝐨𝐧 𝐒𝐲𝐬𝐭𝐞𝐦 | 𝐌𝐊𝟓</div>
+        <div class="sub">واجـهـة ادخـال اسـم الـمـتـفـعـل</div>
+      </div>
+    </div>
+    <div class="nav">
+      <button class="btn" id="logoutBtn">تـسـجـيـل خـروج والـعـودة لـلـصـفـحـة الـرئـيـسـيـة</button>
+    </div>
+  </div>
+
+  <div class="card">
+
+    <h1>ادخـل اسـمـك الـثـنـائـي</h1>
+    <p class="muted">يـجـب إدخـال الاسـم الـحـقـيـقـي بـشـكـل واضـح</p>
+
+    <div class="sep"></div>
+
+    <div id="notice" class="notice" style="display:none;"></div>
+
+    <input id="firstName" class="input" placeholder="ادخـل الاسـم الاول هـنـا">
+    <br><br>
+    <input id="lastName" class="input" placeholder="ادخـل الاسـم الـثـانـي هـنـا">
+
+    <div class="sep"></div>
+
+    <button class="btn primary" id="submitName">اعـتـمـاد الاسـم والارسـال</button>
+
+  </div>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+document.getElementById("logoutBtn").onclick = logout;
+
+requireAuth();
+
+document.getElementById("submitName").onclick = async () => {
+  hideNotice("notice");
+
+  const firstName = document.getElementById("firstName").value.trim();
+  const lastName = document.getElementById("lastName").value.trim();
+
+  if (!firstName || !lastName) {
+    showNotice("notice", "يـجـب عـلـيـك إدخـال الاسـم الأول والـثـانـي");
+    return;
+  }
+
+  const btn = document.getElementById("submitName");
+  btn.disabled = true;
+
+  try {
+    const res = await api("/api/name/submit", {
+      method: "POST",
+      body: JSON.stringify({ firstName, lastName })
+    });
+
+    location.href = res.redirect || "/result.html";
+  } catch (e) {
+    btn.disabled = false;
+
+    if (e.data && e.data.redirect) {
+      location.href = e.data.redirect;
+      return;
+    }
+
+    if (e.data && e.data.error === "NAME_BLOCKED") {
+      showNotice("notice", "لـديـك كـلـمـة مـمـنـوعـة يـجـب كـتـابـة الاسـم الـثـنـائـي الـحـقـيـقـي");
+      return;
+    }
+
+    if (e.data && e.data.error === "NAME_REQUIRED") {
+      showNotice("notice", "يـجـب عـلـيـك إدخـال الاسـم الأول والـثـانـي");
+      return;
+    }
+
+    showNotice("notice", "حـدث خـطـأ فـي اعـتـمـاد الاسـم تـأكـد مـن صـلاحـيـات الـبـوت");
+  }
+};
+</script>
+
+</body>
+</html>

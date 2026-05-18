@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MK5 | تقرير التفعيل</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="header">
+    <div class="brand">
+      <img src="https://i.ibb.co/zHnht2xm/final-4.gif" alt="logo">
+      <div>
+        <div class="title">𝐄𝐥𝐞𝐜𝐭𝐫𝐨𝐧𝐢𝐜 𝐀𝐜𝐭𝐢𝐯𝐚𝐭𝐢𝐨𝐧 𝐒𝐲𝐬𝐭𝐞𝐦 | 𝐌𝐊𝟓</div>
+        <div class="sub">واجـهـة تـقـاريـر الـتـفـعـيـل</div>
+      </div>
+    </div>
+    <div class="nav">
+      <a class="btn" href="/">الـعـودة لـلـرئـيـسـيـة</a>
+      <button class="btn" id="logoutBtn">تـسـجـيـل خـروج والـعـودة لـلـرئـيـسـيـة</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h1>تـم تـفـعـيـلـك وتـسـلـيـمـك رولاتـك بـنـجـاح ┆ ✅</h1>
+    <p class="muted">
+      هـذا تـقـريـر تـفـعـيـلـك بـالـكـامـل | سـيـتـم مـنـحـك الـكـود الـعـسـكـري عـلـى اسـمـك الـثـنـائـي فـي أقـرب وقـت مـن قـبـل طـاقـم الـعـمـل
+    </p>
+
+    <div class="sep"></div>
+
+    <div id="notice" class="notice" style="display:none;"></div>
+    <div id="report" class="muted"></div>
+  </div>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+document.getElementById("logoutBtn").onclick = logout;
+
+async function loadReport(){
+  const me = await requireAuth();
+  if (!me) return;
+
+  try {
+    const r = await api("/api/report");
+
+    document.getElementById("report").innerHTML = `
+      <div style="line-height:2;">
+        <div><b>الاسـم الـثـنـائـي :</b> ${r.fullName || "—"}</div>
+        <div><b>قـطـاعـك الـذي تـم اخـتـيـاره :</b> ${r.sectorName || "—"}</div>
+        <div><b>الـنـسـبـة الـمـئـويـة لـلاخـتـبـار :</b> ${r.score || 0}%</div>
+        <div><b>عـدد الإجابـات الـصـحـيـحـة :</b> ${r.correct || 0}/10</div>
+        <div><b>الـوقـت الـمـسـتـغـرق لـلـتـفـعـيـل :</b> ${r.timeTakenText || "—"}</div>
+      </div>
+    `;
+  } catch (e) {
+    showNotice("notice", "تـعـذر تـحـمـيـل تـقـريـر الـتـفـعـيـل");
+  }
+}
+
+loadReport();
+</script>
+
+</body>
+</html>

@@ -1,4 +1,5 @@
 require("dotenv").config();
+
 const express = require("express");
 const session = require("express-session");
 const cookieParser = require("cookie-parser");
@@ -8,67 +9,199 @@ const path = require("path");
 
 const app = express();
 
+app.set("trust proxy", 1);
+
 app.use(express.json());
 app.use(cookieParser());
+
+const isProd = process.env.NODE_ENV === "production";
+const PORT = Number(process.env.PORT || 3000);
+const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 
 app.use(
   session({
     name: "mk5sid",
-    secret: process.env.SESSION_SECRET || "mk5_secret",
+    secret: process.env.SESSION_SECRET || "CHANGE_ME_SECRET",
     resave: false,
     saveUninitialized: false,
-    cookie: { httpOnly: true, sameSite: "lax" }
+    cookie: {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: isProd,
+      maxAge: 1000 * 60 * 60 * 24
+    }
   })
 );
 
-app.use(express.static("public"));
+app.use(express.static(path.join(__dirname, "public")));
 
-const PORT = Number(process.env.PORT || 3000);
+// ================= CONFIG =================
 
-// ===== Discord IDs =====
 const GUILD_ID = "1114320874057760818";
 const ACTIVATED_ROLE = "1363249951475499269";
 
-// ===== Webhook =====
-const WEBHOOK_URL =
-  process.env.WEBHOOK_URL ||
-  "https://canary.discord.com/api/webhooks/1476987893896712425/pYIdKT9uQZCn9-_p7eRfgzjP3pqTmUCFIAIGagmBjk2-9XJ5MhIJ_nxoBpnsiXAciTYI";
+const WEBHOOK_URL = process.env.WEBHOOK_URL || "";
+const DISCORD_INVITE_URL = process.env.DISCORD_INVITE_URL || "https://discord.gg/mk5";
+const SUCCESS_ADD_ROLE = process.env.SUCCESS_ADD_ROLE || "";
+const SUCCESS_REMOVE_ROLE = process.env.SUCCESS_REMOVE_ROLE || "";
 
-// ===== Cooldown =====
 const COOLDOWN_FILE = path.join(__dirname, "cooldowns.json");
 const FAIL_COOLDOWN_MS = 5 * 60 * 1000;
 
-// ===== Sectors =====
 const SECTORS = [
-  { key: "patrol", name: "قـطـاع الادارة الـعـامـة لـدوريـات الامـن", roleId: "1363249807522529370", image: "/img/sector-patrol.png" },
-  { key: "traffic", name: "قـطـاع الادارة الـعـامـة لـلـمـرور", roleId: "1363249828599169186", image: "/img/sector-traffic.png" },
-  { key: "roads", name: "قـطـاع الادارة الـعـامـة لأمـن الـطـرق", roleId: "1363249837830832198", image: "/img/sector-roads.png" },
-  { key: "governorates", name: "الـمـديـريـة الـعـامـة لـشـرطة الـمـحـافـظـات", roleId: "1363249856335839552", image: "/img/sector-governorates.png" }
+  {
+    key: "patrol",
+    name: "قـطـاع الادارة الـعـامـة لـدوريـات الامـن",
+    roleId: "1363249807522529370",
+    image: "/img/sector-patrol.png"
+  },
+  {
+    key: "traffic",
+    name: "قـطـاع الادارة الـعـامـة لـلـمـرور",
+    roleId: "1363249828599169186",
+    image: "/img/sector-traffic.png"
+  },
+  {
+    key: "roads",
+    name: "قـطـاع الادارة الـعـامـة لأمـن الـطـرق",
+    roleId: "1363249837830832198",
+    image: "/img/sector-roads.png"
+  },
+  {
+    key: "governorates",
+    name: "الـمـديـريـة الـعـامـة لـشـرطة الـمـحـافـظـات",
+    roleId: "1363249856335839552",
+    image: "/img/sector-governorates.png"
+  }
 ];
 
-// ===== Quiz (10 Questions) =====
 const QUIZ = [
-  { q: "هـل يـحـق لـقـطـاع الادارة الـعـامـة لـلـمـرور والـدوريات الـخـروج خـارج الـريـاض :", options: ["يـمـكـنـنـي فـي كـلا الاحـوال الـتـوجـه فـي اي وقـت واي مـطـاردة هـنـاك","فـي حـال كـانـت مـنـطـقـة الـلـعـب هـنـاك","لايـمـكـنـنـي الـتـوجـه هـناك قـطـعا فـي كـلا الاحـوال"], correct: 1 },
-  { q: "الاصـطـفـاف الـعـسـكـري يـتـم فـي احـد الـمـراكـز الـعـسـكـريـة ويـكـون مـن رتـبـة :", options: ["رئـيـس رقـبـاء واعـلـى","مـسـؤول افـراد واعـلـى","رتـبـة مـلازم وأعـلـى مـن ذالـك","اي عـسـكـري يـسـتـطـيـع القـيـام بـ اصـطـفـاف عـسـكري"], correct: 2 },
-  { q: "هـل يـحـق لـقـطـاع امـن الـطـرق وشـرطـة الـمـحـافـظـات الـخـروج مـن الـدمـام وجـدة :", options: ["يـمـكـنـنـي فـي كـلا الاحـوال الـتـوجـه فـي اي وقـت واي مـطـاردة هـنـاك","فـي حـال كـانـت مـنـطـقـة الـلـعـب هـنـاك","لايـمـكـنـنـي الـتـوجـه هـناك قـطـعا فـي كـلا الاحـوال"], correct: 1 },
-  { q: "هـل يـحـق قـطـع بـلاغ عـسـكـري اخـر لـغـرض الاهـمـيـة :", options: ["لايـمـكـنـنـي نـهـائـيـا يـجـب عـلـي انـظـار انـتـهـاء بـلاغ زمـيـلـي كـامـلا ثـم تـمـريـر بـلاغـي","نـعـم ولـكـن بـ انـتـظـام وبـدء الـبـلاغ بـ الاعـتـذار عـن الـمـقـاطـعـة وتـمـريـر بـلاغـك فـي حـال كـن بـلاغـك اهـم"], correct: 1 },
-  { q: "ماهو تعريف الـ RDM :", options: ["الـصـدم الـعـشـوائـي","الـقـتـل الـعـشـوائـي"], correct: 1 },
-  { q: "ماهو تعريف الـ VDM :", options: ["الـصـدم الـعـشـوائـي","الـقـتـل الـعـشـوائـي"], correct: 0 },
-  { q: "هـل يـسـمـح لـك مـعـارضـة امـر ضـابـط :", options: ["يـسـمـح بـسـبـب وجـود وجـه نـظـر مـنـطـقـيـة وصـارمـة","يـجـب عـلـي عـدم مـعـارضـة امـر الـضـبـاط نـهـائيـا وانـفـذ امـره ولـو كأن لـدي وجـه نـظـر اسـتـطـيـع طـرحـهـا عـلـيـه لاحـقـا"], correct: 1 },
-  { q: "ماهي المدة المطلوبة للصدم الاحترافي :", options: ["اسـتـطـيـع صـدمـة فـورا فـي حـال كـان الـشـخـص مـطـلـوبـا او مـهـربـا","بـعـد ثـلاث دقـائـق مـن ابـتـداء الـمـطـاردة","بـعـد خـمـس دقـائـق مـن ابـتـداء الـمـطـاردة","بـعـد عـشـر دقـائـق مـن ابـتـداء الـمـطـاردة"], correct: 2 },
-  { q: "كـيـف تـتـم عـمـلـيـة الاسـتـيـقـاف الـجـنـائـي :", options: ["يـكـون اسـتـيـقـاف الـمـخـالـف مـن خـلـف مـركـبـة الـمـخـالـف","يـكـون اسـتـيـقـاف الـمـخـالـف مـن امـام مـركـبـة الـمـخـالـف"], correct: 1 },
-  { q: "كـيـف تـتـم عـمـلـيـة الاسـتـيـقـاف الـمـروري :", options: ["يـكـون اسـتـيـقـاف الـمـخـالـف مـن خـلـف مـركـبـة الـمـخـالـف","يـكـون اسـتـيـقـاف الـمـخـالـف مـن امـام مـركـبـة الـمـخـالـف"], correct: 0 },
+  {
+    q: "هـل يـحـق لـقـطـاع الادارة الـعـامـة لـلـمـرور والـدوريات الـخـروج خـارج الـريـاض :",
+    options: [
+      "يـمـكـنـنـي فـي كـلا الاحـوال الـتـوجـه فـي اي وقـت واي مـطـاردة هـنـاك",
+      "فـي حـال كـانـت مـنـطـقـة الـلـعـب هـنـاك",
+      "لايـمـكـنـنـي الـتـوجـه هـناك قـطـعا فـي كـلا الاحـوال"
+    ],
+    correct: 1
+  },
+  {
+    q: "الاصـطـفـاف الـعـسـكـري يـتـم فـي احـد الـمـراكـز الـعـسـكـريـة ويـكـون مـن رتـبـة :",
+    options: [
+      "رئـيـس رقـبـاء واعـلـى",
+      "مـسـؤول افـراد واعـلـى",
+      "رتـبـة مـلازم وأعـلـى مـن ذالـك",
+      "اي عـسـكـري يـسـتـطـيـع القـيـام بـ اصـطـفـاف عـسـكري"
+    ],
+    correct: 2
+  },
+  {
+    q: "هـل يـحـق لـقـطـاع امـن الـطـرق وشـرطـة الـمـحـافـظـات الـخـروج مـن الـدمـام وجـدة :",
+    options: [
+      "يـمـكـنـنـي فـي كـلا الاحـوال الـتـوجـه فـي اي وقـت واي مـطـاردة هـنـاك",
+      "فـي حـال كـانـت مـنـطـقـة الـلـعـب هـنـاك",
+      "لايـمـكـنـنـي الـتـوجـه هـناك قـطـعا فـي كـلا الاحـوال"
+    ],
+    correct: 1
+  },
+  {
+    q: "هـل يـحـق قـطـع بـلاغ عـسـكـري اخـر لـغـرض الاهـمـيـة :",
+    options: [
+      "لايـمـكـنـنـي نـهـائـيـا يـجـب عـلـي انـظـار انـتـهـاء بـلاغ زمـيـلـي كـامـلا ثـم تـمـريـر بـلاغـي",
+      "نـعـم ولـكـن بـ انـتـظـام وبـدء الـبـلاغ بـ الاعـتـذار عـن الـمـقـاطـعـة وتـمـريـر بـلاغـك فـي حـال كـن بـلاغـك اهـم"
+    ],
+    correct: 1
+  },
+  {
+    q: "ماهو تعريف الـ RDM :",
+    options: ["الـصـدم الـعـشـوائـي", "الـقـتـل الـعـشـوائـي"],
+    correct: 1
+  },
+  {
+    q: "ماهو تعريف الـ VDM :",
+    options: ["الـصـدم الـعـشـوائـي", "الـقـتـل الـعـشـوائـي"],
+    correct: 0
+  },
+  {
+    q: "هـل يـسـمـح لـك مـعـارضـة امـر ضـابـط :",
+    options: [
+      "يـسـمـح بـسـبـب وجـود وجـه نـظـر مـنـطـقـيـة وصـارمـة",
+      "يـجـب عـلـي عـدم مـعـارضـة امـر الـضـبـاط نـهـائيـا وانـفـذ امـره ولـو كأن لـدي وجـه نـظـر اسـتـطـيـع طـرحـهـا عـلـيـه لاحـقـا"
+    ],
+    correct: 1
+  },
+  {
+    q: "ماهي المدة المطلوبة للصدم الاحترافي :",
+    options: [
+      "اسـتـطـيـع صـدمـة فـورا فـي حـال كـان الـشـخـص مـطـلـوبـا او مـهـربـا",
+      "بـعـد ثـلاث دقـائـق مـن ابـتـداء الـمـطـاردة",
+      "بـعـد خـمـس دقـائـق مـن ابـتـداء الـمـطـاردة",
+      "بـعـد عـشـر دقـائـق مـن ابـتـداء الـمـطـاردة"
+    ],
+    correct: 2
+  },
+  {
+    q: "كـيـف تـتـم عـمـلـيـة الاسـتـيـقـاف الـجـنـائـي :",
+    options: [
+      "يـكـون اسـتـيـقـاف الـمـخـالـف مـن خـلـف مـركـبـة الـمـخـالـف",
+      "يـكـون اسـتـيـقـاف الـمـخـالـف مـن امـام مـركـبـة الـمـخـالـف"
+    ],
+    correct: 1
+  },
+  {
+    q: "كـيـف تـتـم عـمـلـيـة الاسـتـيـقـاف الـمـروري :",
+    options: [
+      "يـكـون اسـتـيـقـاف الـمـخـالـف مـن خـلـف مـركـبـة الـمـخـالـف",
+      "يـكـون اسـتـيـقـاف الـمـخـالـف مـن امـام مـركـبـة الـمـخـالـف"
+    ],
+    correct: 0
+  }
 ];
 
-// ================= Helpers =================
+// ================= HELPERS =================
 
 function requireLogin(req, res, next) {
-  if (!req.session.user) return res.status(401).json({ error: "NOT_LOGGED_IN" });
+  if (!req.session.user) {
+    return res.status(401).json({
+      error: "NOT_LOGGED_IN",
+      redirect: "/"
+    });
+  }
   next();
 }
 
+async function requireGuild(req, res, next) {
+  try {
+    if (!req.session.user) {
+      return res.status(401).json({ error: "NOT_LOGGED_IN", redirect: "/" });
+    }
+
+    const member = await discordGetMember(req.session.user.id);
+    if (!member || !Array.isArray(member.roles)) {
+      return res.status(403).json({
+        error: "NOT_IN_GUILD",
+        message: "يـجـب دخـول ديـسـكـورد الـسـيـرفـر أولاً",
+        inviteUrl: DISCORD_INVITE_URL,
+        redirect: "/"
+      });
+    }
+
+    next();
+  } catch (e) {
+    console.error("[MK5] REQUIRE_GUILD_FAILED", e.message);
+    return res.status(403).json({
+      error: "NOT_IN_GUILD",
+      message: "يـجـب دخـول ديـسـكـورد الـسـيـرفـر أولاً",
+      inviteUrl: DISCORD_INVITE_URL,
+      redirect: "/"
+    });
+  }
+}
+
 function ensureCooldownFile() {
-  if (!fs.existsSync(COOLDOWN_FILE)) fs.writeFileSync(COOLDOWN_FILE, JSON.stringify({}), "utf8");
+  if (!fs.existsSync(COOLDOWN_FILE)) {
+    fs.writeFileSync(COOLDOWN_FILE, JSON.stringify({}), "utf8");
+  }
 }
 
 function readCooldowns() {
@@ -88,7 +221,7 @@ function getCooldownRemainingMs(userId) {
   const c = readCooldowns();
   const until = Number(c[userId] || 0);
   const now = Date.now();
-  return until > now ? (until - now) : 0;
+  return until > now ? until - now : 0;
 }
 
 function setCooldown(userId, ms) {
@@ -97,39 +230,44 @@ function setCooldown(userId, ms) {
   writeCooldowns(c);
 }
 
-function containsAbu(text) {
+function containsBlockedWord(text) {
   if (!text) return false;
+
   const t = String(text).toLowerCase().replace(/\s+/g, "");
-  // ابو / أبو
-  return t.includes("ابو") 
-  || t.includes("أبو") 
-  || t.includes("كس") 
-  || t.includes("مجلخ") 
-  || t.includes("العراب") 
-  || t.includes("نايكم") 
-  || t.includes("الزق") 
-  || t.includes("زق") 
-  || t.includes("تبن") 
-  || t.includes("التبن") 
-  || t.includes("حيوان") 
-  || t.includes("الحيوان") 
-  || t.includes("الفيمبوي") 
-  || t.includes("الديوث") 
-  || t.includes("المكسكس") 
-  || t.includes("المزبزب") 
-  || t.includes("اه") 
-  || t.includes("عاهرة") 
-  || t.includes("عاهره") 
-  || t.includes("الحيوان")
-  || t.includes("ـ")  
-  || t.includes("عرابكم");
+
+  const blocked = [
+    "ابو",
+    "أبو",
+    "كس",
+    "مجلخ",
+    "العراب",
+    "نايكم",
+    "الزق",
+    "زق",
+    "تبن",
+    "التبن",
+    "حيوان",
+    "الحيوان",
+    "الفيمبوي",
+    "الديوث",
+    "المكسكس",
+    "المزبزب",
+    "عاهرة",
+    "عاهره",
+    "عرابكم",
+    "ـ"
+  ];
+
+  return blocked.some(w => t.includes(w));
 }
 
 function msToReadable(ms) {
   const sec = Math.max(0, Math.floor(ms / 1000));
   const m = Math.floor(sec / 60);
   const s = sec % 60;
-  return m > 0 ? `${m}دقـائـق و ${s} ثـانـيـة` : `${s} ثـانـيـة`;
+
+  if (m > 0) return `${m} دقـائـق و ${s} ثـانـيـة`;
+  return `${s} ثـانـيـة`;
 }
 
 function buildAvatarUrl(id, avatar) {
@@ -137,15 +275,27 @@ function buildAvatarUrl(id, avatar) {
   return `https://cdn.discordapp.com/avatars/${id}/${avatar}.png?size=256`;
 }
 
-// ================= Discord API =================
+function getRedirectUri() {
+  return process.env.DISCORD_REDIRECT_URI || `${BASE_URL}/auth/callback`;
+}
+
+function requireEnv(name) {
+  if (!process.env[name]) {
+    console.warn(`[MK5] Missing env: ${name}`);
+  }
+}
+
+// ================= DISCORD API =================
 
 async function discordTokenExchange(code) {
+  const redirectUri = getRedirectUri();
+
   const body = new URLSearchParams({
     client_id: process.env.DISCORD_CLIENT_ID,
     client_secret: process.env.DISCORD_CLIENT_SECRET,
     grant_type: "authorization_code",
     code,
-    redirect_uri: process.env.DISCORD_REDIRECT_URI
+    redirect_uri: redirectUri
   });
 
   const r = await fetch("https://discord.com/api/oauth2/token", {
@@ -154,7 +304,12 @@ async function discordTokenExchange(code) {
     body
   });
 
-  if (!r.ok) throw new Error("TOKEN_EXCHANGE_FAILED");
+  if (!r.ok) {
+    const txt = await r.text().catch(() => "");
+    console.error("TOKEN_EXCHANGE_FAILED:", txt);
+    throw new Error("TOKEN_EXCHANGE_FAILED");
+  }
+
   return r.json();
 }
 
@@ -162,100 +317,132 @@ async function discordFetchUser(accessToken) {
   const r = await fetch("https://discord.com/api/users/@me", {
     headers: { Authorization: `Bearer ${accessToken}` }
   });
+
   if (!r.ok) throw new Error("FETCH_USER_FAILED");
   return r.json();
 }
 
 async function discordGetMember(userId) {
-  const r = await fetch(
-    `https://discord.com/api/guilds/${GUILD_ID}/members/${userId}`,
-    { headers: { Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}` } }
-  );
-  if (!r.ok) return null;
+  const url = `https://discord.com/api/guilds/${GUILD_ID}/members/${userId}`;
+
+  const r = await fetch(url, {
+    headers: {
+      Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`
+    }
+  });
+
+  if (!r.ok) {
+    const txt = await r.text().catch(() => "");
+    console.error("[MK5] GET_MEMBER_FAILED", {
+      status: r.status,
+      userId,
+      guildId: GUILD_ID,
+      response: txt
+    });
+    return null;
+  }
+
   return r.json();
 }
 
 async function discordMemberHasRole(userId, roleId) {
   const member = await discordGetMember(userId);
-  if (!member || !member.roles) return false;
+  if (!member || !Array.isArray(member.roles)) return false;
   return member.roles.includes(roleId);
 }
 
 async function discordAddRole(userId, roleId) {
   const r = await fetch(
     `https://discord.com/api/guilds/${GUILD_ID}/members/${userId}/roles/${roleId}`,
-    { method: "PUT", headers: { Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}` } }
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`
+      }
+    }
   );
-  if (!r.ok) throw new Error("ADD_ROLE_FAILED");
+
+  if (!r.ok) {
+    const txt = await r.text().catch(() => "");
+    console.error("ADD_ROLE_FAILED:", txt);
+    throw new Error("ADD_ROLE_FAILED");
+  }
 }
 
-async function sendWebhookLog({ userId, username, avatarUrl, fullName, sectorName, scorePct, correct, timeTakenText }) {
+async function discordRemoveRole(userId, roleId) {
+  if (!roleId) return;
+
+  const r = await fetch(
+    `https://discord.com/api/guilds/${GUILD_ID}/members/${userId}/roles/${roleId}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`
+      }
+    }
+  );
+
+  if (!r.ok) {
+    const txt = await r.text().catch(() => "");
+    console.error("REMOVE_ROLE_FAILED:", txt);
+    throw new Error("REMOVE_ROLE_FAILED");
+  }
+}
+
+async function sendWebhookLog({
+  userId,
+  avatarUrl,
+  fullName,
+  sectorName,
+  scorePct,
+  correct,
+  timeTakenText
+}) {
   if (!WEBHOOK_URL) return;
 
-await fetch(WEBHOOK_URL, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    username: "MK5 Activation Log",
-    content: "**@everyone | @here**",
-    embeds: [
-      {
-      title: "هـنـاك مـتـفـعـل نـاجـح وجـديـد ┆ ✅",
-      color: 0x27b7ff,
-      thumbnail: avatarUrl ? { url: avatarUrl } : undefined,
-     fields: [
-
-  {
-    name: "\u200B",
-    value: `**الـمـتـفـعّـل :** <@${userId}>`,
-    inline: false
-  },
-
-  {
-    name: "\u200B",
-    value: `**الاسـم الـثـنـائـي :** ${fullName || "—"}`,
-    inline: false
-  },
-
-  {
-    name: "\u200B",
-    value: `**قـطـاع الـمـتـفـعـل :** ${sectorName || "—"}`,
-    inline: false
-  },
-
-  {
-    name: "\u200B",
-    value: `**الـنـسـبـة الـمـئـويـة :** ${scorePct}% | ${correct}/10`,
-    inline: false
-  },
-
-  {
-    name: "\u200B",
-    value: `**الـوقـت الـمـسـتـغـرق :** ${timeTakenText || "—"}`,
-    inline: false
-  }
-
-],
-      footer: { text: "سـلـم الـكـود الـعـسـكـري لـ اسـم الـمـتـفـعـل اعـلاه واتـبـع الـتـعـلـيـمـات" }
-      }
-    ]
-  })
-}).catch(() => {});
+  await fetch(WEBHOOK_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username: "MK5 Activation Log",
+      content: "**@everyone | @here**",
+      embeds: [
+        {
+          title: "هـنـاك مـتـفـعـل نـاجـح وجـديـد ┆ ✅",
+          color: 0x27b7ff,
+          thumbnail: avatarUrl ? { url: avatarUrl } : undefined,
+          fields: [
+            { name: "\u200B", value: `**الـمـتـفـعّـل :** <@${userId}>`, inline: false },
+            { name: "\u200B", value: `**الاسـم الـثـنـائـي :** ${fullName || "—"}`, inline: false },
+            { name: "\u200B", value: `**قـطـاع الـمـتـفـعـل :** ${sectorName || "—"}`, inline: false },
+            { name: "\u200B", value: `**الـنـسـبـة الـمـئـويـة :** ${scorePct}% | ${correct}/10`, inline: false },
+            { name: "\u200B", value: `**الـوقـت الـمـسـتـغـرق :** ${timeTakenText || "—"}`, inline: false }
+          ],
+          footer: {
+            text: "سـلـم الـكـود الـعـسـكـري لـ اسـم الـمـتـفـعـل اعـلاه واتـبـع الـتـعـلـيـمـات"
+          }
+        }
+      ]
+    })
+  }).catch(() => {});
 }
 
 // ================= AUTH =================
 
 app.get("/auth/login", (req, res) => {
+  const redirectUri = getRedirectUri();
+
   const params = new URLSearchParams({
     client_id: process.env.DISCORD_CLIENT_ID,
-    redirect_uri: process.env.DISCORD_REDIRECT_URI,
+    redirect_uri: redirectUri,
     response_type: "code",
     scope: "identify"
   });
+
   res.redirect(`https://discord.com/api/oauth2/authorize?${params.toString()}`);
 });
 
-app.get("/auth/callback", async (req, res) => {
+async function handleDiscordCallback(req, res) {
   try {
     const { code } = req.query;
     if (!code) return res.redirect("/?e=no_code");
@@ -271,7 +458,6 @@ app.get("/auth/callback", async (req, res) => {
       avatarUrl: buildAvatarUrl(user.id, user.avatar || "")
     };
 
-    // نبدأ الفلو من لحظة تسجيل الدخول
     req.session.flow = {
       startedAt: Date.now(),
       quizDone: false,
@@ -284,76 +470,106 @@ app.get("/auth/callback", async (req, res) => {
       finishedAt: null
     };
 
-    res.redirect("/");
+    req.session.save(() => {
+      res.redirect("/");
+    });
   } catch (e) {
+    console.error("[MK5] AUTH_CALLBACK_FAILED", e.message);
     res.redirect("/?e=auth_failed");
   }
-});
+}
+
+app.get("/auth/callback", handleDiscordCallback);
+app.get("/auth/discord/callback", handleDiscordCallback);
 
 app.post("/auth/logout", (req, res) => {
-  req.session.destroy(() => res.json({ ok: true }));
+  req.session.destroy(() => {
+    res.json({ ok: true });
+  });
 });
 
 // ================= API =================
 
 app.get("/api/me", requireLogin, async (req, res) => {
-  const cd = getCooldownRemainingMs(req.session.user.id);
+  try {
+    const cooldownMs = getCooldownRemainingMs(req.session.user.id);
+    const member = await discordGetMember(req.session.user.id);
+    const inGuild = !!member && Array.isArray(member.roles);
+    const hasActivatedRole = inGuild && member.roles.includes(ACTIVATED_ROLE);
 
-  // هل هو مفعل مسبقاً؟
-  const hasActivatedRole = await discordMemberHasRole(req.session.user.id, ACTIVATED_ROLE);
-
-  res.json({
-    user: req.session.user,
-    flow: req.session.flow || null,
-    hasActivatedRole,
-    cooldownRemainingMs: cd,
-    cooldownRemainingText: cd ? msToReadable(cd) : "",
-    sectors: SECTORS.map(s => ({ key: s.key, name: s.name, image: s.image }))
-  });
+    return res.json({
+      user: req.session.user,
+      inGuild,
+      inviteUrl: DISCORD_INVITE_URL,
+      cooldownMs,
+      cooldownText: msToReadable(cooldownMs),
+      hasActivatedRole,
+      flow: req.session.flow || null,
+      checkedAt: Date.now()
+    });
+  } catch (e) {
+    console.error("[MK5] API_ME_FAILED", e.message);
+    return res.json({
+      user: req.session.user,
+      inGuild: false,
+      inviteUrl: DISCORD_INVITE_URL,
+      cooldownMs: 0,
+      cooldownText: "0 ثـانـيـة",
+      hasActivatedRole: false,
+      flow: req.session.flow || null,
+      checkedAt: Date.now()
+    });
+  }
 });
 
-app.get("/api/quiz", requireLogin, (req, res) => {
-  const cd = getCooldownRemainingMs(req.session.user.id);
-  if (cd > 0) {
+app.get("/api/quiz", requireLogin, requireGuild, (req, res) => {
+  const cooldownMs = getCooldownRemainingMs(req.session.user.id);
+
+  if (cooldownMs > 0) {
     return res.status(429).json({
       error: "COOLDOWN",
-      cooldownMs: cd,
-      cooldownText: msToReadable(cd),
-      redirect: `/?cooldown=1&wait=${encodeURIComponent(msToReadable(cd))}`
+      cooldownMs,
+      cooldownText: msToReadable(cooldownMs),
+      redirect: `/?cooldown=1&wait=${encodeURIComponent(msToReadable(cooldownMs))}`
     });
   }
 
   res.json({
     total: QUIZ.length,
-    questions: QUIZ.map(q => ({ q: q.q, options: q.options }))
+    questions: QUIZ.map(q => ({
+      q: q.q,
+      options: q.options
+    }))
   });
 });
 
-app.post("/api/quiz/submit", requireLogin, async (req, res) => {
-  // لو عليه كولداون
-  const cdNow = getCooldownRemainingMs(req.session.user.id);
-  if (cdNow > 0) {
+app.post("/api/quiz/submit", requireLogin, requireGuild, async (req, res) => {
+  const cooldownMs = getCooldownRemainingMs(req.session.user.id);
+
+  if (cooldownMs > 0) {
     return res.status(429).json({
       error: "COOLDOWN",
-      cooldownMs: cdNow,
-      cooldownText: msToReadable(cdNow),
-      redirect: `/?cooldown=1&wait=${encodeURIComponent(msToReadable(cdNow))}`
+      cooldownMs,
+      cooldownText: msToReadable(cooldownMs),
+      redirect: `/?cooldown=1&wait=${encodeURIComponent(msToReadable(cooldownMs))}`
     });
   }
 
   const { answers } = req.body;
+
   if (!Array.isArray(answers) || answers.length !== QUIZ.length) {
     return res.status(400).json({ error: "BAD_ANSWERS" });
   }
 
   let correct = 0;
-  answers.forEach((a, i) => {
-    if (Number(a) === Number(QUIZ[i].correct)) correct++;
+
+  answers.forEach((answer, i) => {
+    if (Number(answer) === Number(QUIZ[i].correct)) {
+      correct++;
+    }
   });
 
-  const score = correct * 10;
-
-  // ✅ النجاح من 5/10
+  const score = Math.round((correct / QUIZ.length) * 100);
   const passed = correct >= 5;
 
   req.session.flow = req.session.flow || {};
@@ -362,86 +578,170 @@ app.post("/api/quiz/submit", requireLogin, async (req, res) => {
   req.session.flow.score = score;
   req.session.flow.passed = passed;
 
-  // ❌ رسوب: أقل من 4 صح = كولداون 5 دقائق + يرجعه الرئيسية مع رسالة
-  if (correct < 4) {
+  if (!passed) {
     setCooldown(req.session.user.id, FAIL_COOLDOWN_MS);
     const cd = getCooldownRemainingMs(req.session.user.id);
 
-    return res.json({
-      redirect: `/?failed=1&cooldown=1&wait=${encodeURIComponent(msToReadable(cd))}`
+    req.session.save(() => {
+      res.json({
+        passed: false,
+        correct,
+        score,
+        redirect: `/?failed=1&cooldown=1&wait=${encodeURIComponent(msToReadable(cd))}`
+      });
     });
+
+    return;
   }
 
-  // رسوب عادي (4 صح بالضبط) بدون كولداون (تقدر تغيّرها لو تبي)
-  if (!passed) {
-    return res.json({ redirect: "/result.html" });
-  }
-
-  // نجاح
-  return res.json({ redirect: "/sector.html" });
+  req.session.save(() => {
+    res.json({
+      passed: true,
+      correct,
+      score,
+      redirect: "/sector.html"
+    });
+  });
 });
 
-app.post("/api/sector/select", requireLogin, async (req, res) => {
+app.get("/api/sectors", requireLogin, requireGuild, (req, res) => {
   const flow = req.session.flow || {};
 
   if (!flow.quizDone || !flow.passed) {
-    return res.status(403).json({ error: "QUIZ_REQUIRED" });
+    return res.status(403).json({
+      error: "QUIZ_REQUIRED",
+      redirect: "/quiz.html"
+    });
   }
 
-  if (flow.sectorKey) {
-    return res.status(409).json({ error: "SECTOR_ALREADY_SELECTED" });
-  }
-
-  const { sectorKey } = req.body;
-  const sector = SECTORS.find(s => s.key === sectorKey);
-  if (!sector) return res.status(400).json({ error: "BAD_SECTOR" });
-
-  await discordAddRole(req.session.user.id, sector.roleId);
-
-  flow.sectorKey = sector.key;
-  flow.sectorName = sector.name;
-  req.session.flow = flow;
-
-  req.session.save(() => res.json({ redirect: "/name.html" }));
+  res.json({
+    sectors: SECTORS.map(s => ({
+      key: s.key,
+      name: s.name,
+      image: s.image
+    }))
+  });
 });
 
-app.post("/api/name/submit", requireLogin, async (req, res) => {
-  const flow = req.session.flow || {};
-  if (!flow.quizDone || !flow.passed) return res.status(403).json({ error: "QUIZ_REQUIRED" });
-  if (!flow.sectorKey) return res.status(403).json({ error: "SECTOR_REQUIRED" });
+app.post("/api/sector/select", requireLogin, requireGuild, async (req, res) => {
+  try {
+    const flow = req.session.flow || {};
 
-  const { firstName, lastName } = req.body;
+    if (!flow.quizDone || !flow.passed) {
+      return res.status(403).json({
+        error: "QUIZ_REQUIRED",
+        redirect: "/quiz.html"
+      });
+    }
 
-  const fn = String(firstName || "").trim();
-  const ln = String(lastName || "").trim();
+    if (flow.sectorKey) {
+      return res.status(409).json({
+        error: "SECTOR_ALREADY_SELECTED",
+        redirect: "/name.html"
+      });
+    }
 
-  if (!fn || !ln) return res.status(400).json({ error: "NAME_REQUIRED" });
-  if (containsAbu(fn) || containsAbu(ln)) return res.status(400).json({ error: "ABU_BLOCKED" });
+    const { sectorKey } = req.body;
+    const sector = SECTORS.find(s => s.key === sectorKey);
 
-  const fullName = `${fn} ${ln}`.trim();
+    if (!sector) {
+      return res.status(400).json({ error: "BAD_SECTOR" });
+    }
 
-  flow.fullName = fullName;
-  flow.finishedAt = Date.now();
-  req.session.flow = flow;
+    await discordAddRole(req.session.user.id, sector.roleId);
 
-  const elapsedMs = (flow.finishedAt - (flow.startedAt || flow.finishedAt));
-  const timeTakenText = msToReadable(elapsedMs);
+    flow.sectorKey = sector.key;
+    flow.sectorName = sector.name;
+    req.session.flow = flow;
 
-  // هنا فقط نعطي رول التفعيل النهائي
-  await discordAddRole(req.session.user.id, ACTIVATED_ROLE);
+    req.session.save(() => {
+      res.json({
+        ok: true,
+        redirect: "/name.html"
+      });
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({
+      error: "SECTOR_ROLE_FAILED"
+    });
+  }
+});
 
-  await sendWebhookLog({
-    userId: req.session.user.id,
-    username: req.session.user.username,
-    avatarUrl: req.session.user.avatarUrl,
-    fullName,
-    sectorName: flow.sectorName,
-    scorePct: flow.score || 0,
-    correct: flow.correct || 0,
-    timeTakenText
-  });
+app.post("/api/name/submit", requireLogin, requireGuild, async (req, res) => {
+  try {
+    const flow = req.session.flow || {};
 
-  req.session.save(() => res.json({ redirect: "/result.html" }));
+    if (!flow.quizDone || !flow.passed) {
+      return res.status(403).json({
+        error: "QUIZ_REQUIRED",
+        redirect: "/quiz.html"
+      });
+    }
+
+    if (!flow.sectorKey) {
+      return res.status(403).json({
+        error: "SECTOR_REQUIRED",
+        redirect: "/sector.html"
+      });
+    }
+
+    const fn = String(req.body.firstName || "").trim();
+    const ln = String(req.body.lastName || "").trim();
+
+    if (!fn || !ln) {
+      return res.status(400).json({
+        error: "NAME_REQUIRED"
+      });
+    }
+
+    if (containsBlockedWord(fn) || containsBlockedWord(ln)) {
+      return res.status(400).json({
+        error: "NAME_BLOCKED"
+      });
+    }
+
+    const fullName = `${fn} ${ln}`.trim();
+
+    flow.fullName = fullName;
+    flow.finishedAt = Date.now();
+    req.session.flow = flow;
+
+    const elapsedMs = flow.finishedAt - (flow.startedAt || flow.finishedAt);
+    const timeTakenText = msToReadable(elapsedMs);
+
+    await discordAddRole(req.session.user.id, ACTIVATED_ROLE);
+
+    if (SUCCESS_ADD_ROLE) {
+      await discordAddRole(req.session.user.id, SUCCESS_ADD_ROLE);
+    }
+
+    if (SUCCESS_REMOVE_ROLE) {
+      await discordRemoveRole(req.session.user.id, SUCCESS_REMOVE_ROLE);
+    }
+
+    await sendWebhookLog({
+      userId: req.session.user.id,
+      avatarUrl: req.session.user.avatarUrl,
+      fullName,
+      sectorName: flow.sectorName,
+      scorePct: flow.score || 0,
+      correct: flow.correct || 0,
+      timeTakenText
+    });
+
+    req.session.save(() => {
+      res.json({
+        ok: true,
+        redirect: "/result.html"
+      });
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({
+      error: "FINISH_FAILED"
+    });
+  }
 });
 
 app.get("/api/report", requireLogin, (req, res) => {
@@ -458,10 +758,26 @@ app.get("/api/report", requireLogin, (req, res) => {
     correct: Number(f.correct || 0),
     timeTakenMs: elapsedMs,
     timeTakenText: msToReadable(elapsedMs),
-    passed: !!f.passed
+    passed: !!f.passed,
+    finished: !!f.fullName
   });
 });
 
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+// ================= START =================
+
+requireEnv("DISCORD_CLIENT_ID");
+requireEnv("DISCORD_CLIENT_SECRET");
+requireEnv("DISCORD_BOT_TOKEN");
+requireEnv("DISCORD_REDIRECT_URI");
+requireEnv("SESSION_SECRET");
+
 app.listen(PORT, () => {
-  console.log(`MK5 Activation running on http://localhost:${PORT}`);
+  console.log(`[MK5] Activation website running on port ${PORT}`);
+  console.log(`[MK5] Redirect URI: ${getRedirectUri()}`);
+  console.log(`[MK5] Invite URL: ${DISCORD_INVITE_URL}`);
+  console.log(`[MK5] Available at: ${BASE_URL}`);
 });

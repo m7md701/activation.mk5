@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MK5 | صـفـحـة الـنـظـام الـرئـيـسـيـة</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="wrap">
+  <div class="header">
+    <div class="brand">
+      <img src="https://i.ibb.co/zHnht2xm/final-4.gif" alt="logo">
+      <div>
+        <div class="title">𝐄𝐥𝐞𝐜𝐭𝐫𝐨𝐧𝐢𝐜 𝐀𝐜𝐭𝐢𝐯𝐚𝐭𝐢𝐨𝐧 𝐒𝐲𝐬𝐭𝐞𝐦 | 𝐌𝐊𝟓</div>
+        <div class="sub">الـواجـهـة الـرئـيـسـيـة لـلـنـظـام</div>
+      </div>
+    </div>
+
+    <div class="nav" id="navArea">
+      <a href="https://mk5sa.rzq.sa/" target="_blank" class="btn">زر مـتـجـر الـمـديـنـة</a>
+      <a href="https://discord.gg/mk5" target="_blank" class="btn">انـضـم إلـى الـديـسـكـورد</a>
+      <a id="authBtn" class="btn primary" href="/auth/login">تـسـجـيـل الـدخـول بـالـنـظـام</a>
+    </div>
+  </div>
+
+  <div id="homeNotice" class="notice bad" style="display:none; margin-top:14px;"></div>
+
+  <div class="card">
+    <h1>نـظـام التـفـعـيـل الإلـكـتـرونـي الـحـديـث - MK5</h1>
+    <div class="sep"></div>
+    <p class="muted" style="line-height:1.9;">
+      مـرحـبـاً بـك فـي نـظـام الـتـفـعـيـل الـرسـمـي لـسـيـرفـر مـود الـشـرطـة ام كـي فـايـف
+      تـم إنـشـاء هـذا الـنـظـام لاعـتـمـاد الـلاعـبـيـن الـراغـبـيـن فـي الانـضـمـام
+      إلـى الـمـديـنـة بـشـكـل آلي وسـلـس وآمـن
+    </p>
+
+    <div class="sep"></div>
+    <h2>آلـيـة الـتـفـعـيـل :</h2>
+    <ul style="line-height:2;">
+      <li>تـسـجـيـل الـدخـول عـبـر حـسـاب ديـسـكـورد الـخـاص بـك</li>
+      <li>اجـتـيـاز اخـتـبـار الـتـفـعـيـل الـ 10 اسـألـة</li>
+      <li>اخـتـيـار الـقـطـاع الـعـسـكـري الـمـنـاسـب لـك</li>
+      <li>إدخـال الاسـم الـثـنـائـي الـحـقـيـقـي</li>
+      <li>اسـتـلام الـرول الـمـعـتـمـد داخـل الـسـيـرفـر</li>
+    </ul>
+
+    <div class="sep"></div>
+    <h2>ملاحظات هـامـة جـدا :</h2>
+    <ul style="line-height:2;">
+      <li>يـجـب كـتـابـة الاسـم الـحـقـيـقـي بـشـكـل كـامـل وواضـح</li>
+      <li>فـي حـال الـرسـوب يـمـكـنـك إعـادة الـمـحـاولـة بـعـد 5 دقـائـق</li>
+      <li>يـمـنـع إعـادة الـتـفـعـيـل إذا كـنـت مـفـعـل مـسـبـقـاً</li>
+      <li>يـجـب عـلـيـك الـتـواجـد فـي ديـسـكـورد الـمـديـنـة قـبـل تـسـجـيل دخـولـك</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+let guildTimer = null;
+let checkingGuild = false;
+const DISCORD_INVITE_FALLBACK = "https://discord.gg/mk5";
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, {
+    credentials: "include",
+    cache: "no-store",
+    headers: { "Content-Type": "application/json", "Cache-Control": "no-cache" },
+    ...opts
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const err = new Error(data.error || "API_ERROR");
+    err.data = data;
+    throw err;
+  }
+  return data;
+}
+
+async function loadMe() {
+  try { return await api("/api/me?t=" + Date.now()); }
+  catch { return null; }
+}
+
+function getBtn(){ return document.getElementById("authBtn"); }
+function setLoginButton(){
+  const btn = getBtn(); if(!btn) return;
+  btn.textContent = "تـسـجـيـل الـدخـول بـالـنـظـام";
+  btn.href = "/auth/login";
+  btn.target = ""; btn.rel = ""; btn.onclick = null;
+}
+function setNeedDiscordButton(inviteUrl){
+  const btn = getBtn(); if(!btn) return;
+  const finalInvite = inviteUrl || DISCORD_INVITE_FALLBACK;
+  btn.textContent = "يـجـب دخـول الـديـسـكـورد أولاً";
+  btn.href = finalInvite;
+  btn.target = "_blank";
+  btn.rel = "noopener noreferrer";
+  btn.onclick = function(){ startGuildWatcher(); };
+}
+function setActivationButton(){
+  const btn = getBtn(); if(!btn) return;
+  btn.textContent = "بـدء الـتـفـعـيـل الإلـكـتـرونـي";
+  btn.href = "/rules.html";
+  btn.target = ""; btn.rel = ""; btn.onclick = null;
+}
+function setActivatedButton(){
+  const btn = getBtn(); if(!btn) return;
+  btn.textContent = "أنـت مـفـعـل مـسـبـقـاً";
+  btn.href = "/result.html";
+  btn.target = ""; btn.rel = ""; btn.onclick = null;
+}
+function showNotice(text, ok){
+  const box = document.getElementById("homeNotice"); if(!box) return;
+  box.style.display = "block";
+  box.className = ok ? "notice ok" : "notice bad";
+  box.textContent = text;
+}
+function stopGuildWatcher(){ if(guildTimer){ clearInterval(guildTimer); guildTimer = null; } }
+async function refreshGuildStatus(showSuccess){
+  if(checkingGuild) return;
+  checkingGuild = true;
+  const me = await loadMe();
+  checkingGuild = false;
+  if(!me){ stopGuildWatcher(); setLoginButton(); return; }
+  if(me.inGuild){
+    stopGuildWatcher();
+    if(me.hasActivatedRole) setActivatedButton();
+    else setActivationButton();
+    if(showSuccess && !me.hasActivatedRole) showNotice("تـم الـتـعـرف عـلـى دخـولـك لـلـديـسـكـورد، يـمـكـنـك الآن بـدء الـتـفـعـيـل", true);
+    return;
+  }
+  setNeedDiscordButton(me.inviteUrl || DISCORD_INVITE_FALLBACK);
+  startGuildWatcher();
+}
+function startGuildWatcher(){
+  if(guildTimer) return;
+  guildTimer = setInterval(() => refreshGuildStatus(true), 2000);
+}
+window.addEventListener("focus", () => refreshGuildStatus(true));
+document.addEventListener("visibilitychange", () => { if(!document.hidden) refreshGuildStatus(true); });
+(function(){
+  const p = new URLSearchParams(location.search);
+  const cooldown = p.get("cooldown");
+  const wait = p.get("wait") || "خـمـس دقـائـق";
+  const failed = p.get("failed");
+  const e = p.get("e");
+  if(cooldown || failed) showNotice(`رسـبـت بـالاخـتـبـار يـرجـى الانـتـظـار ${wait} قـبـل إعـادة الـمـحـاولـة`, false);
+  if(e) showNotice("حـدث خـطـأ فـي تـسـجـيـل الـدخـول تـأكـد مـن إعـدادات Discord OAuth", false);
+})();
+refreshGuildStatus(false);
+</script>
+</body>
+</html>

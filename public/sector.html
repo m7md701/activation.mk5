@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MK5 | صـفـحـة اخـتـيـار الـقـطـاع</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="header">
+    <div class="brand">
+      <img src="https://i.ibb.co/zHnht2xm/final-4.gif" alt="logo">
+      <div>
+        <div class="title">𝐄𝐥𝐞𝐜𝐭𝐫𝐨𝐧𝐢𝐜 𝐀𝐜𝐭𝐢𝐯𝐚𝐭𝐢𝐨𝐧 𝐒𝐲𝐬𝐭𝐞𝐦 | 𝐌𝐊𝟓</div>
+        <div class="sub">صـفـحـة اخـتـيـار الـقـطـاع الـعـسـكـري</div>
+      </div>
+    </div>
+    <div class="nav">
+      <button class="btn" id="logoutBtn">تـسـجـيـل خـروج والـعـودة لـلـرئـيـسـيـة</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h1>اخـتـر قـطـاعـك الـعـسـكـري الـذي تـريـد الـمـبـاشـرة بـه</h1>
+    <p class="muted">يـمـكـنـك اخـتـيـار قـطـاع واحـد فـقـط بـ ضـغـطـك لـخـيـار الـقـطـاع الـمـراد</p>
+    <div class="sep"></div>
+
+    <div id="notice" class="notice" style="display:none;"></div>
+    <div id="sectors" class="sector-grid"></div>
+  </div>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+document.getElementById("logoutBtn").onclick = logout;
+
+async function loadSectors(){
+  const me = await requireAuth();
+  if (!me) return;
+
+  try {
+    const data = await api("/api/sectors");
+    const sectorsBox = document.getElementById("sectors");
+    sectorsBox.innerHTML = "";
+
+    data.sectors.forEach(sec => {
+      const btn = document.createElement("button");
+      btn.className = "sector-btn";
+
+      btn.innerHTML = `
+        <div class="sector-content">
+          <img src="${sec.image}" class="sector-img" onerror="this.style.display='none'">
+          <span>${sec.name} ┆</span>
+        </div>
+      `;
+
+      btn.onclick = async () => {
+        hideNotice("notice");
+        btn.disabled = true;
+
+        try {
+          const res = await api("/api/sector/select", {
+            method: "POST",
+            body: JSON.stringify({ sectorKey: sec.key })
+          });
+
+          location.href = res.redirect || "/name.html";
+        } catch (e) {
+          btn.disabled = false;
+
+          if (e.data && e.data.redirect) {
+            location.href = e.data.redirect;
+            return;
+          }
+
+          showNotice("notice", "حـدث خـطـأ فـي اخـتـيـار الـقـطـاع تـأكـد مـن صـلاحـيـات الـبـوت");
+        }
+      };
+
+      sectorsBox.appendChild(btn);
+    });
+  } catch (e) {
+    if (e.data && e.data.redirect) {
+      location.href = e.data.redirect;
+      return;
+    }
+
+    showNotice("notice", "تـعـذر تـحـمـيـل الـقـطـاعـات");
+  }
+}
+
+loadSectors();
+</script>
+
+</body>
+</html>

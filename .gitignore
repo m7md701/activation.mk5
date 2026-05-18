@@ -1,0 +1,5 @@
+node_modules
+.env
+cooldowns.json
+npm-debug.log
+.DS_Store
