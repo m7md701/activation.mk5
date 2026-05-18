@@ -10,7 +10,6 @@ const path = require("path");
 const app = express();
 
 app.set("trust proxy", 1);
-
 app.use(express.json());
 app.use(cookieParser());
 
@@ -37,11 +36,12 @@ app.use(express.static(path.join(__dirname, "public")));
 
 // ================= CONFIG =================
 
-const GUILD_ID = "1114320874057760818";
-const ACTIVATED_ROLE = "1363249951475499269";
+const GUILD_ID = process.env.GUILD_ID || "1489022506139517170";
+const ACTIVATED_ROLE = process.env.ACTIVATED_ROLE || "1489044217446666331";
 
 const WEBHOOK_URL = process.env.WEBHOOK_URL || "";
 const DISCORD_INVITE_URL = process.env.DISCORD_INVITE_URL || "https://discord.gg/mk5";
+
 const SUCCESS_ADD_ROLE = process.env.SUCCESS_ADD_ROLE || "";
 const SUCCESS_REMOVE_ROLE = process.env.SUCCESS_REMOVE_ROLE || "";
 
@@ -172,26 +172,20 @@ function requireLogin(req, res, next) {
 
 async function requireGuild(req, res, next) {
   try {
-    if (!req.session.user) {
-      return res.status(401).json({ error: "NOT_LOGGED_IN", redirect: "/" });
-    }
-
     const member = await discordGetMember(req.session.user.id);
+
     if (!member || !Array.isArray(member.roles)) {
       return res.status(403).json({
         error: "NOT_IN_GUILD",
-        message: "يـجـب دخـول ديـسـكـورد الـسـيـرفـر أولاً",
         inviteUrl: DISCORD_INVITE_URL,
         redirect: "/"
       });
     }
 
     next();
-  } catch (e) {
-    console.error("[MK5] REQUIRE_GUILD_FAILED", e.message);
+  } catch {
     return res.status(403).json({
       error: "NOT_IN_GUILD",
-      message: "يـجـب دخـول ديـسـكـورد الـسـيـرفـر أولاً",
       inviteUrl: DISCORD_INVITE_URL,
       redirect: "/"
     });
@@ -232,30 +226,12 @@ function setCooldown(userId, ms) {
 
 function containsBlockedWord(text) {
   if (!text) return false;
-
   const t = String(text).toLowerCase().replace(/\s+/g, "");
 
   const blocked = [
-    "ابو",
-    "أبو",
-    "كس",
-    "مجلخ",
-    "العراب",
-    "نايكم",
-    "الزق",
-    "زق",
-    "تبن",
-    "التبن",
-    "حيوان",
-    "الحيوان",
-    "الفيمبوي",
-    "الديوث",
-    "المكسكس",
-    "المزبزب",
-    "عاهرة",
-    "عاهره",
-    "عرابكم",
-    "ـ"
+    "ابو","أبو","كس","مجلخ","العراب","نايكم","الزق","زق","تبن","التبن",
+    "حيوان","الحيوان","الفيمبوي","الديوث","المكسكس","المزبزب",
+    "عاهرة","عاهره","عرابكم","ـ"
   ];
 
   return blocked.some(w => t.includes(w));
@@ -265,7 +241,6 @@ function msToReadable(ms) {
   const sec = Math.max(0, Math.floor(ms / 1000));
   const m = Math.floor(sec / 60);
   const s = sec % 60;
-
   if (m > 0) return `${m} دقـائـق و ${s} ثـانـيـة`;
   return `${s} ثـانـيـة`;
 }
@@ -279,23 +254,15 @@ function getRedirectUri() {
   return process.env.DISCORD_REDIRECT_URI || `${BASE_URL}/auth/callback`;
 }
 
-function requireEnv(name) {
-  if (!process.env[name]) {
-    console.warn(`[MK5] Missing env: ${name}`);
-  }
-}
-
 // ================= DISCORD API =================
 
 async function discordTokenExchange(code) {
-  const redirectUri = getRedirectUri();
-
   const body = new URLSearchParams({
     client_id: process.env.DISCORD_CLIENT_ID,
     client_secret: process.env.DISCORD_CLIENT_SECRET,
     grant_type: "authorization_code",
     code,
-    redirect_uri: redirectUri
+    redirect_uri: getRedirectUri()
   });
 
   const r = await fetch("https://discord.com/api/oauth2/token", {
@@ -306,7 +273,7 @@ async function discordTokenExchange(code) {
 
   if (!r.ok) {
     const txt = await r.text().catch(() => "");
-    console.error("TOKEN_EXCHANGE_FAILED:", txt);
+    console.error("[MK5] TOKEN_EXCHANGE_FAILED", txt);
     throw new Error("TOKEN_EXCHANGE_FAILED");
   }
 
@@ -318,18 +285,24 @@ async function discordFetchUser(accessToken) {
     headers: { Authorization: `Bearer ${accessToken}` }
   });
 
-  if (!r.ok) throw new Error("FETCH_USER_FAILED");
+  if (!r.ok) {
+    const txt = await r.text().catch(() => "");
+    console.error("[MK5] FETCH_USER_FAILED", txt);
+    throw new Error("FETCH_USER_FAILED");
+  }
+
   return r.json();
 }
 
 async function discordGetMember(userId) {
-  const url = `https://discord.com/api/guilds/${GUILD_ID}/members/${userId}`;
-
-  const r = await fetch(url, {
-    headers: {
-      Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`
+  const r = await fetch(
+    `https://discord.com/api/guilds/${GUILD_ID}/members/${userId}`,
+    {
+      headers: {
+        Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`
+      }
     }
-  });
+  );
 
   if (!r.ok) {
     const txt = await r.text().catch(() => "");
@@ -345,13 +318,9 @@ async function discordGetMember(userId) {
   return r.json();
 }
 
-async function discordMemberHasRole(userId, roleId) {
-  const member = await discordGetMember(userId);
-  if (!member || !Array.isArray(member.roles)) return false;
-  return member.roles.includes(roleId);
-}
-
 async function discordAddRole(userId, roleId) {
+  if (!roleId) return;
+
   const r = await fetch(
     `https://discord.com/api/guilds/${GUILD_ID}/members/${userId}/roles/${roleId}`,
     {
@@ -364,7 +333,7 @@ async function discordAddRole(userId, roleId) {
 
   if (!r.ok) {
     const txt = await r.text().catch(() => "");
-    console.error("ADD_ROLE_FAILED:", txt);
+    console.error("[MK5] ADD_ROLE_FAILED", txt);
     throw new Error("ADD_ROLE_FAILED");
   }
 }
@@ -384,7 +353,7 @@ async function discordRemoveRole(userId, roleId) {
 
   if (!r.ok) {
     const txt = await r.text().catch(() => "");
-    console.error("REMOVE_ROLE_FAILED:", txt);
+    console.error("[MK5] REMOVE_ROLE_FAILED", txt);
     throw new Error("REMOVE_ROLE_FAILED");
   }
 }
@@ -430,11 +399,9 @@ async function sendWebhookLog({
 // ================= AUTH =================
 
 app.get("/auth/login", (req, res) => {
-  const redirectUri = getRedirectUri();
-
   const params = new URLSearchParams({
     client_id: process.env.DISCORD_CLIENT_ID,
-    redirect_uri: redirectUri,
+    redirect_uri: getRedirectUri(),
     response_type: "code",
     scope: "identify"
   });
@@ -444,8 +411,11 @@ app.get("/auth/login", (req, res) => {
 
 async function handleDiscordCallback(req, res) {
   try {
-    const { code } = req.query;
-    if (!code) return res.redirect("/?e=no_code");
+    const code = req.query.code;
+
+    if (!code) {
+      return res.redirect("/");
+    }
 
     const token = await discordTokenExchange(code);
     const user = await discordFetchUser(token.access_token);
@@ -475,7 +445,7 @@ async function handleDiscordCallback(req, res) {
     });
   } catch (e) {
     console.error("[MK5] AUTH_CALLBACK_FAILED", e.message);
-    res.redirect("/?e=auth_failed");
+    res.redirect("/");
   }
 }
 
@@ -494,21 +464,21 @@ app.get("/api/me", requireLogin, async (req, res) => {
   try {
     const cooldownMs = getCooldownRemainingMs(req.session.user.id);
     const member = await discordGetMember(req.session.user.id);
+
     const inGuild = !!member && Array.isArray(member.roles);
     const hasActivatedRole = inGuild && member.roles.includes(ACTIVATED_ROLE);
 
     return res.json({
       user: req.session.user,
-      inGuild,
+      inGuild: inGuild,
       inviteUrl: DISCORD_INVITE_URL,
       cooldownMs,
       cooldownText: msToReadable(cooldownMs),
-      hasActivatedRole,
+      hasActivatedRole: hasActivatedRole,
       flow: req.session.flow || null,
       checkedAt: Date.now()
     });
   } catch (e) {
-    console.error("[MK5] API_ME_FAILED", e.message);
     return res.json({
       user: req.session.user,
       inGuild: false,
@@ -641,8 +611,7 @@ app.post("/api/sector/select", requireLogin, requireGuild, async (req, res) => {
       });
     }
 
-    const { sectorKey } = req.body;
-    const sector = SECTORS.find(s => s.key === sectorKey);
+    const sector = SECTORS.find(s => s.key === req.body.sectorKey);
 
     if (!sector) {
       return res.status(400).json({ error: "BAD_SECTOR" });
@@ -661,10 +630,8 @@ app.post("/api/sector/select", requireLogin, requireGuild, async (req, res) => {
       });
     });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({
-      error: "SECTOR_ROLE_FAILED"
-    });
+    console.error("[MK5] SECTOR_ROLE_FAILED", e.message);
+    res.status(500).json({ error: "SECTOR_ROLE_FAILED" });
   }
 });
 
@@ -690,15 +657,11 @@ app.post("/api/name/submit", requireLogin, requireGuild, async (req, res) => {
     const ln = String(req.body.lastName || "").trim();
 
     if (!fn || !ln) {
-      return res.status(400).json({
-        error: "NAME_REQUIRED"
-      });
+      return res.status(400).json({ error: "NAME_REQUIRED" });
     }
 
     if (containsBlockedWord(fn) || containsBlockedWord(ln)) {
-      return res.status(400).json({
-        error: "NAME_BLOCKED"
-      });
+      return res.status(400).json({ error: "NAME_BLOCKED" });
     }
 
     const fullName = `${fn} ${ln}`.trim();
@@ -737,10 +700,8 @@ app.post("/api/name/submit", requireLogin, requireGuild, async (req, res) => {
       });
     });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({
-      error: "FINISH_FAILED"
-    });
+    console.error("[MK5] FINISH_FAILED", e.message);
+    res.status(500).json({ error: "FINISH_FAILED" });
   }
 });
 
@@ -763,21 +724,18 @@ app.get("/api/report", requireLogin, (req, res) => {
   });
 });
 
+// ================= FALLBACK =================
+
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
 // ================= START =================
 
-requireEnv("DISCORD_CLIENT_ID");
-requireEnv("DISCORD_CLIENT_SECRET");
-requireEnv("DISCORD_BOT_TOKEN");
-requireEnv("DISCORD_REDIRECT_URI");
-requireEnv("SESSION_SECRET");
-
 app.listen(PORT, () => {
-  console.log(`[MK5] Activation website running on port ${PORT}`);
-  console.log(`[MK5] Redirect URI: ${getRedirectUri()}`);
-  console.log(`[MK5] Invite URL: ${DISCORD_INVITE_URL}`);
-  console.log(`[MK5] Available at: ${BASE_URL}`);
+  console.log(`[MK5] running on port ${PORT}`);
+  console.log(`[MK5] BASE_URL: ${BASE_URL}`);
+  console.log(`[MK5] REDIRECT_URI: ${getRedirectUri()}`);
+  console.log(`[MK5] GUILD_ID: ${GUILD_ID}`);
+  console.log(`[MK5] ACTIVATED_ROLE: ${ACTIVATED_ROLE}`);
 });
